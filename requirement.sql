@@ -14,10 +14,15 @@ WHERE courses.isAvailable = 1;
 -- 4) Students can enrol in a course. Students should not be able to enrol in a course more than
 -- once at each time.
 -- Find all users that are students
-INSERT INTO enrolments (CourseID, UserID) VALUES (5,10); 
-WHERE NOT EXISTS ( 
-SELECT * FROM enrolments 
-WHERE CourseID = 5 AND UserID = 10); 
+INSERT INTO enrolments (CourseID, UserID)
+SELECT 1, 10
+FROM enrolments
+WHERE NOT EXISTS (
+    SELECT *
+    FROM enrolments
+    WHERE CourseID = 1 AND UserID = 10
+    LIMIT 1
+);
 -- 5) Teachers can fail or pass a student.
 UPDATE enrolments SET Mark = 1 WHERE CourseID =5 AND UserID = 10;
 -- 6) Access control for Admins, Teachers and Students: Ensure only the authorized access can
