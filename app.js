@@ -70,8 +70,8 @@ app.put('/courses/:id/disable/:userId', (req, res) => {
             // Main SQL query to update the database
             connection.query('UPDATE courses SET isAvailable = 0 WHERE CourseID = ?', [courseId], (updateError, updateResults) => {
                 if (updateError) {
-                    console.error('Error enabling course:', updateError);
-                    return res.status(500).json({ error: 'An error occurred while enabling the course' }); // Send 500 Internal Server Error if there's an SQL error
+                    console.error('Error disabling course:', updateError);
+                    return res.status(500).json({ error: 'An error occurred while disabling the course' }); // Send 500 Internal Server Error if there's an SQL error
                 }
 
                 res.json({ message: 'Course disabled successfully' }); // Confirmation if the course is disabled successfully
@@ -118,6 +118,28 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
         return res.status(500).json({ error: error }); // Send 500 Internal Server Error if there's an SQL error
     });
    
+});
+
+// Define route handler for listing available courses with course title and teacher's name
+app.get('/courses', (req, res) => {
+    // SQL query to retrieve available courses with teacher's name
+    const query = `
+        SELECT courses.Title, users.Name AS TeacherName 
+        FROM courses 
+        JOIN users ON courses.TeacherID = users.UserID 
+        WHERE courses.isAvailable = 1;
+    `;
+    
+    // Execute the SQL query
+    connection.query(query, (error, results) => {
+        if (error) {
+            console.error('Error fetching available courses:', error);
+            return res.status(500).json({ error: 'An error occurred while fetching available courses' }); // Send 500 Internal Server Error if there's an SQL error
+        }
+
+        // Send the list of available courses with teacher's name as JSON response
+        res.json(results);
+    });
 });
 
 function is_admin(userId) {
