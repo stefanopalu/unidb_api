@@ -66,11 +66,13 @@ app.put('/courses/:id/enable/:userId', (req, res) => {
 });
 
 
+
+
 // Define route handler for assigning a course to a teacher
 
 app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
-    const teacherId = req.params.teacherId // Exctract teacherId from request parameters
+    const teacherId = req.params.teacherId; // Exctract teacherId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
     
     // Check if user that is being assigned has the role teacher via a promise
@@ -103,6 +105,106 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     });
    
 });
+
+
+
+
+//Define route handler for enrolling students in a course 
+
+app.put('/courses/:id/assign_student/:userId', (req, res) => {
+    const courseId = req.params.id; // Extract courseId from request parameters
+    const userId = req.params.userId; // Extract userId from request parameters   
+    
+    // Check if user that is being assigned has the role student via a promise
+    const isStudentPromise = is_student(userId)
+    
+
+    // Callback for all promises
+    Promise.all([isStudentPromise]).then((values) => {
+        console.log(values)
+        isStudent = values[0]
+
+        if (!isStudent) {
+            return res.status(403).json({ error: 'user is not a student' }); // Send 403 Forbidden if user is not authorized
+        }
+        connection.query(`INSERT INTO enrolments (CourseID, UserID)
+        SELECT 1, 10
+        FROM enrolments
+        WHERE NOT EXISTS (
+            SELECT *
+            FROM enrolments
+            WHERE CourseID = 1 AND UserID = 10
+            LIMIT 1
+        ); `, [courseId, userId, courseId, userId], (updateError, updateResults) => {
+            if (updateError) {
+                console.error('Error assigning student:', updateError);
+                return res.status(500).json({ error: 'An error occurred while assigning student to the course' }); // Send 500 Internal Server Error if there's an SQL error
+            }
+
+            res.json({ message: 'Student assigned successfully' }); // Confirmation if the course is enabled successfully
+        });
+      }).catch((error) => {
+        return res.status(500).json({ error: error }); // Send 500 Internal Server Error if there's an SQL error
+    });
+   
+});
+
+
+
+//Define route handler for teacher to fail or pass a student
+
+
+app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
+    const courseId = req.params.id; // Extract courseId from request parameters
+    const studentId = req.params.studentId; //Extract studentId from request parameters
+    const passed = parseInt (req.params.passed); // Extract passed from request parameters
+    const userId = req.params.userId; // Extract userId from request parameters   
+    
+    // Check if user that is being assigned has the role teacher via a promise
+    const isTeacherPromise = is_teacher(userId)
+    
+
+    // Check if user that is being assigned has the role student via a promise
+    const isStudentPromise = is_student(studentId)
+
+
+    // Callback for all promises
+    Promise.all([isTeacherPromise, isStudentPromise]).then((values) => {
+        console.log(values)
+        isTeacher = values[0]
+        isStudent = values[1]
+
+        if (!isTeacher) {
+            return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
+        }
+
+
+        if (!isStudent) {
+            return res.status(403).json({ error: 'user is not a student' }); // Send 403 Forbidden if user is not authorized
+        }
+
+        // Checking if passed (0 or 1)
+
+        if (!(passed === 0 || passed === 1)) {
+            return res.status(403).json({ error: "passed should be 1 or 0"}) //Error that passed should be 1 or 0
+        }
+
+
+        connection.query('UPDATE enrolments SET Mark = ? WHERE CourseID = ? AND UserID = ?', 
+        [passed, courseId, studentId], (updateError, updateResults) => {
+            if (updateError) {
+                console.error('Error assigning grade:', updateError);
+                return res.status(500).json({ error: 'An error occurred while assigning grade to the student' }); // Send 500 Internal Server Error if there's an SQL error
+            }
+
+            res.json({ message: 'Grade assigned successfully' }); // Confirmation if the grade is assigned successfully
+        });
+      }).catch((error) => {
+        return res.status(500).json({ error: error }); // Send 500 Internal Server Error if there's an SQL error
+    });
+   
+});
+
 
 
 
@@ -141,3 +243,24 @@ function is_teacher(userId) {
         });
     });
 }
+
+
+
+// Function to check if user is a student, via Promise
+
+function is_student(userId) {
+    return new Promise((resolve, reject) => {
+        connection.query('SELECT * FROM users JOIN roles ON roles.RoleID = users.RoleID WHERE Role = "Student" AND UserID = ?', [userId], (error, results) => {
+            if (error) {
+                console.error('Error fetching user details:', error);
+                reject('An error occurred while fetching user details')
+            }
+            if (results.length === 0) {
+                resolve(false)
+            } else {
+                resolve(true)
+            }
+        });
+    });
+}
+
