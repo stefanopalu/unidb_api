@@ -143,43 +143,45 @@ app.get('/courses', (req, res) => {
 
 //Define route handler for enrolling students in a course 
 
-app.put('/courses/:id/assign_student/:userId', (req, res) => {
+app.put('/courses/:id/enrol_student/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
     
-    // Check if user that is being assigned has the role student via a promise
-    const isStudentPromise = is_student(userId)
-    
-
-    // Callback for all promises
-    Promise.all([isStudentPromise]).then((values) => {
-        console.log(values)
-        isStudent = values[0]
-
-        if (!isStudent) {
-            return res.status(403).json({ error: 'user is not a student' }); // Send 403 Forbidden if user is not authorized
-        }
-        connection.query(`INSERT INTO enrolments (CourseID, UserID)
-        SELECT 1, 10
-        FROM enrolments
-        WHERE NOT EXISTS (
-            SELECT *
-            FROM enrolments
-            WHERE CourseID = 1 AND UserID = 10
-            LIMIT 1
-        ); `, [courseId, userId, courseId, userId], (updateError, updateResults) => {
-            if (updateError) {
-                console.error('Error assigning student:', updateError);
-                return res.status(500).json({ error: 'An error occurred while assigning student to the course' }); // Send 500 Internal Server Error if there's an SQL error
+    // Check if the user is a student
+    is_student(userId)
+        .then((isStudent) => {
+            if (!isStudent) {
+                return res.status(403).json({ error: 'User is not a student' });
             }
 
-            res.json({ message: 'Student assigned successfully' }); // Confirmation if the course is enabled successfully
+            // Check if the record exists in the table
+            connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (selectError, selectResults) => {
+                if (selectError) {
+                    console.error('Error checking record:', selectError);
+                    return res.status(500).json({ error: 'An error occurred while checking record' });
+                }
+
+                // If no record exists, insert the data
+                if (selectResults.length === 0) {
+                    connection.query('INSERT INTO enrolments (CourseID, UserID) VALUES (?, ?)', [courseId, userId], (insertError, insertResults) => {
+                        if (insertError) {
+                            console.error('Error inserting record:', insertError);
+                            return res.status(500).json({ error: 'An error occurred while inserting record' });
+                        }
+
+                        res.json({ message: 'Student assigned successfully' });
+                    });
+                } else {
+                    res.json({ message: 'Student is already enrolled' });
+                }
+            });
+        })
+        .catch((error) => {
+            console.error('Error checking student status:', error);
+            res.status(500).json({ error: 'An error occurred while checking student status' });
         });
-      }).catch((error) => {
-        return res.status(500).json({ error: error }); // Send 500 Internal Server Error if there's an SQL error
-    });
-   
 });
+
 
 //Define route handler for teacher to fail or pass a student
 app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
