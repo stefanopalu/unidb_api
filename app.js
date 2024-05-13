@@ -130,7 +130,7 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
         isTeacher = values[0]
         isAdmin = values[1]
         doesCourseExist = values[2]
-        
+
         if (!isAdmin) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
@@ -162,7 +162,7 @@ app.get('/courses', (req, res) => {
     const query = `
         SELECT courses.Title, users.Name AS TeacherName 
         FROM courses 
-        JOIN users ON courses.TeacherID = users.UserID 
+        LEFT JOIN users ON courses.TeacherID = users.UserID 
         WHERE courses.isAvailable = 1;
     `;
 
