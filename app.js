@@ -246,10 +246,14 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     // Check if user that is being assigned has the role student via a promise
     const isStudentPromise = is_student(studentId)
 
+    // Check if enrolment exists
+    const doesEnrolmentExistPromise = does_enrolment_exist(courseId, userId)
+
     // Callback for all promises
-    Promise.all([isTeacherPromise, isStudentPromise]).then((values) => {
+    Promise.all([isTeacherPromise, isStudentPromise, doesEnrolmentExistPromise]).then((values) => {
         isTeacher = values[0]
         isStudent = values[1]
+        doesEnrolmentExist = values[2]
 
         if (!isTeacher) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
@@ -257,6 +261,10 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
 
         if (!isStudent) {
             return res.status(403).json({ error: 'user is not a student' }); // Send 403 Forbidden if user is not authorized
+        }
+
+        if (!doesEnrolmentExist) {
+            return res.status (403).json({ error: 'Enrolment does not exist'}); // Send error message that enrolment does not exist
         }
 
         // Checking if passed (0 or 1)
@@ -339,6 +347,25 @@ function does_course_exist(courseId) {
             if (error) {
                 console.error('Error fetching course details:', error);
                 reject('An error occurred while fetching course details')
+            }
+            if (results.length === 0) {
+                resolve(false)
+            } else {
+                resolve(true)
+            }
+        });
+    });
+}
+
+
+// Function to check if enrolment exists
+
+function does_enrolment_exist(courseId, userId) {
+    return new Promise((resolve, reject) => {
+        connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (error, results) => {
+            if (error) {
+                console.error('Error fetching enrolment details:', error);
+                reject('An error occurred while finding enrolment details')
             }
             if (results.length === 0) {
                 resolve(false)
