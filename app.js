@@ -121,16 +121,27 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     // Check that the current user is an admin via a promise
     const isAdminPromise = is_admin(userId)
 
+    // Check if course exists
+
+    const doesCourseExistPromise = does_course_exist(courseId)
+
     // Callback for all promises
-    Promise.all([isTeacherPromise, isAdminPromise]).then((values) => {
+    Promise.all([isTeacherPromise, isAdminPromise, doesCourseExistPromise]).then((values) => {
         isTeacher = values[0]
         isAdmin = values[1]
+        doesCourseExist = values[2]
+        
         if (!isAdmin) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
         if (!isTeacher) {
             return res.status(403).json({ error: 'user is not a teacher' }); // Send 403 Forbidden if user is not authorized
         }
+
+        if (!doesCourseExist) {
+            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+        }
+
         connection.query('UPDATE courses SET TeacherID = ? WHERE CourseID = ?', [teacherId, courseId], (updateError, updateResults) => {
             if (updateError) {
                 console.error('Error assigning teacher:', updateError);
