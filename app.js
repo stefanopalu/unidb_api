@@ -184,35 +184,48 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
 
-    // Check if the user is a student
-    is_student(userId)
-        .then((isStudent) => {
-            if (!isStudent) {
-                return res.status(403).json({ error: 'User is not a student' });
+    // Check if user that is being assigned has the role student via a promise
+    const isStudentPromise = is_student(userId)
+
+    // Check if course exists
+
+    const doesCourseExistPromise = does_course_exist(courseId)
+
+    Promise.all([doesCourseExistPromise, isStudentPromise]).then((values) => {
+
+        doesCourseExist = values[0]
+        isStudent = values[1]
+
+        if (!isStudent) {
+            return res.status(403).json({ error: 'User is not a student' });
+        }
+
+        if (!doesCourseExist) {
+            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+        }
+
+        // Check if the record exists in the table
+        connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (selectError, selectResults) => {
+            if (selectError) {
+                console.error('Error checking record:', selectError);
+                return res.status(500).json({ error: 'An error occurred while checking record' });
             }
 
-            // Check if the record exists in the table
-            connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (selectError, selectResults) => {
-                if (selectError) {
-                    console.error('Error checking record:', selectError);
-                    return res.status(500).json({ error: 'An error occurred while checking record' });
-                }
+            // If no record exists, insert the data
+            if (selectResults.length === 0) {
+                connection.query('INSERT INTO enrolments (CourseID, UserID) VALUES (?, ?)', [courseId, userId], (insertError, insertResults) => {
+                    if (insertError) {
+                        console.error('Error inserting record:', insertError);
+                        return res.status(500).json({ error: 'An error occurred while inserting record' });
+                    }
 
-                // If no record exists, insert the data
-                if (selectResults.length === 0) {
-                    connection.query('INSERT INTO enrolments (CourseID, UserID) VALUES (?, ?)', [courseId, userId], (insertError, insertResults) => {
-                        if (insertError) {
-                            console.error('Error inserting record:', insertError);
-                            return res.status(500).json({ error: 'An error occurred while inserting record' });
-                        }
-
-                        res.json({ message: 'Student assigned successfully' });
-                    });
-                } else {
-                    res.json({ message: 'Student is already enrolled' });
-                }
-            });
-        })
+                    res.json({ message: 'Student assigned successfully' });
+                });
+            } else {
+                res.json({ message: 'Student is already enrolled' });
+            }
+        });
+    })
         .catch((error) => {
             console.error('Error checking student status:', error);
             res.status(500).json({ error: 'An error occurred while checking student status' });
