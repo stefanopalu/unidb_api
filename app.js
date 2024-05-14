@@ -179,32 +179,29 @@ app.get('/courses', (req, res) => {
 });
 
 //Define route handler for enrolling students in a course 
-
 app.put('/courses/:id/enrol_student/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
-
+    
     // Check if user that is being assigned has the role student via a promise
-    const isStudentPromise = is_student(userId)
+    const isStudentPromise = is_student(userId);
 
-    // Check if course exists
+    // Check if course is available
+    const isCourseAvailablePromise = is_course_available(courseId);
 
-    const doesCourseExistPromise = does_course_exist(courseId)
-
-    Promise.all([doesCourseExistPromise, isStudentPromise]).then((values) => {
-
-        doesCourseExist = values[0]
-        isStudent = values[1]
+    Promise.all([isStudentPromise, isCourseAvailablePromise]).then((values) => {
+        const isStudent = values[0];
+        const isCourseAvailable = values[1];
 
         if (!isStudent) {
             return res.status(403).json({ error: 'User is not a student' });
         }
 
-        if (!doesCourseExist) {
-            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+        if (!isCourseAvailable) {
+            return res.status(403).json({ error: 'Course is not available' });
         }
 
-        // Check if the record exists in the table
+        // Check if the record exists in the enrolments table
         connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (selectError, selectResults) => {
             if (selectError) {
                 console.error('Error checking record:', selectError);
@@ -226,12 +223,11 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
             }
         });
     })
-        .catch((error) => {
-            console.error('Error checking student status:', error);
-            res.status(500).json({ error: 'An error occurred while checking student status' });
-        });
+    .catch((error) => {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'An error occurred' });
+    });
 });
-
 
 //Define route handler for teacher to fail or pass a student
 app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
@@ -247,13 +243,13 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     const isStudentPromise = is_student(studentId)
 
     // Check if enrolment exists
-    const doesEnrolmentExistPromise = does_enrolment_exist(courseId, userId)
+    const doesEnrolmentExistPromise = does_enrolment_exist(courseId, studentId)
 
     // Callback for all promises
     Promise.all([isTeacherPromise, isStudentPromise, doesEnrolmentExistPromise]).then((values) => {
-        isTeacher = values[0]
-        isStudent = values[1]
-        doesEnrolmentExist = values[2]
+        const isTeacher = values[0]
+        const isStudent = values[1]
+        const doesEnrolmentExist = values[2]
 
         if (!isTeacher) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
@@ -357,12 +353,27 @@ function does_course_exist(courseId) {
     });
 }
 
+// Function to check if a course is available
+function is_course_available(courseId) {
+    return new Promise((resolve, reject) => {
+        connection.query('SELECT isAvailable FROM courses WHERE courseId = ?', [courseId], (error, results) => {
+            if (error) {
+                reject(error);
+            } else if (results.length === 0) {
+                resolve(false); // Course does not exist
+            } else {
+                resolve(results[0].isAvailable === 1); // Return true if course is available, otherwise false
+            }
+        });
+    });
+}
+
 
 // Function to check if enrolment exists
 
-function does_enrolment_exist(courseId, userId) {
+function does_enrolment_exist(courseId, studentId) {
     return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, userId], (error, results) => {
+        connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, studentId], (error, results) => {
             if (error) {
                 console.error('Error fetching enrolment details:', error);
                 reject('An error occurred while finding enrolment details')
