@@ -2,6 +2,8 @@
 const express = require('express');
 const mysql = require('mysql2');
 
+const validation = require('./validation');
+
 const app = express();
 const PORT = 3000;
 
@@ -34,10 +36,10 @@ app.put('/courses/:id/enable/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters
 
     // Check if course exists
-    const doesCourseExistPromise = does_course_exist(courseId)
+    const doesCourseExistPromise = validation.does_course_exist(connection, courseId)
 
     // Check if the user is an admin
-    const isAdminPromise = is_admin(userId)
+    const isAdminPromise = validation.is_admin(connection, userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
         const doesCourseExist = values[0];
@@ -72,10 +74,10 @@ app.put('/courses/:id/disable/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters
 
     // Check if course exists
-    const doesCourseExistPromise = does_course_exist(courseId)
+    const doesCourseExistPromise = validation.does_course_exist(connection, courseId)
 
     // Check if the user is an admin
-    const isAdminPromise = is_admin(userId)
+    const isAdminPromise = validation.is_admin(connection, userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
         const doesCourseExist = values[0];
@@ -110,13 +112,13 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters   
 
     // Check if user that is being assigned has the role teacher via a promise
-    const isTeacherPromise = is_teacher(teacherId)
+    const isTeacherPromise = validation.is_teacher(connection, teacherId)
 
     // Check that the current user is an admin via a promise
-    const isAdminPromise = is_admin(userId)
+    const isAdminPromise = validation.is_admin(connection, userId)
 
     // Check if course exists
-    const doesCourseExistPromise = does_course_exist(courseId)
+    const doesCourseExistPromise = validation.does_course_exist(connection, courseId)
 
     // Callback for all promises
     Promise.all([isTeacherPromise, isAdminPromise, doesCourseExistPromise]).then((values) => {
@@ -176,10 +178,10 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters   
     
     // Check if user that is being assigned has the role student via a promise
-    const isStudentPromise = is_student(userId);
+    const isStudentPromise = validation.is_student(connection, userId);
 
     // Check if course is available
-    const isCourseAvailablePromise = is_course_available(courseId);
+    const isCourseAvailablePromise = validation.is_course_available(connection, courseId);
 
     Promise.all([isStudentPromise, isCourseAvailablePromise]).then((values) => {
         const isStudent = values[0];
@@ -227,18 +229,15 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     const studentId = req.params.studentId; //Extract studentId from request parameters
     const passed = parseInt(req.params.passed); // Extract passed from request parameters
     const userId = req.params.userId; // Extract userId from request parameters  
-    
-    console.log('courseId:', courseId, 'studentId:', studentId, 'passed:', passed, 'userId:', userId);
-
 
     // Check if user that is being assigned has the role teacher via a promise
-    const isAssignedTeacherPromise = is_assigned_teacher(courseId, userId)
+    const isAssignedTeacherPromise = validation.is_assigned_teacher(connection, courseId, userId)
 
     // Check if user that is being assigned has the role student via a promise
-    const isStudentPromise = is_student(studentId)
+    const isStudentPromise = validation.is_student(connection, studentId)
 
     // Check if enrolment exists
-    const doesEnrolmentExistPromise = does_enrolment_exist(courseId, studentId)
+    const doesEnrolmentExistPromise = validation.does_enrolment_exist(connection, courseId, studentId)
 
     // Callback for all promises
     Promise.all([isAssignedTeacherPromise, isStudentPromise, doesEnrolmentExistPromise]).then((values) => {
@@ -277,124 +276,3 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     });
 
 });
-
-
-// Function to check if user is an admin, via Promise
-function is_admin(userId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM users JOIN roles ON roles.RoleID = users.RoleID WHERE Role = "Admin" AND UserID = ?', [userId], (error, results) => {
-            if (error) {
-                console.error('Error fetching user details:', error);
-                reject('An error occurred while fetching user details')
-            }
-            if (results.length === 0) {
-                resolve(false)
-            } else {
-                resolve(true)
-            }
-        });
-    });
-}
-
-// Function to check if user is an teacher, via Promise
-function is_teacher(userId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM users JOIN roles ON roles.RoleID = users.RoleID WHERE Role = "Teacher" AND UserID = ?', [userId], (error, results) => {
-            if (error) {
-                console.error('Error fetching user details:', error);
-                reject('An error occurred while fetching user details')
-            }
-            if (results.length === 0) {
-                resolve(false)
-            } else {
-                resolve(true)
-            }
-        });
-    });
-}
-
-// Function to check if user is a student, via Promise
-function is_student(userId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM users JOIN roles ON roles.RoleID = users.RoleID WHERE Role = "Student" AND UserID = ?', [userId], (error, results) => {
-            if (error) {
-                console.error('Error fetching user details:', error);
-                reject('An error occurred while fetching user details')
-            }
-            if (results.length === 0) {
-                resolve(false)
-            } else {
-                resolve(true)
-            }
-        });
-    });
-}
-
-// Function to check if course exists
-function does_course_exist(courseId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM courses WHERE CourseID = ?', [courseId], (error, results) => {
-            if (error) {
-                console.error('Error fetching course details:', error);
-                reject('An error occurred while fetching course details')
-            }
-            if (results.length === 0) {
-                resolve(false)
-            } else {
-                resolve(true)
-            }
-        });
-    });
-}
-
-// Function to check if a course is available
-function is_course_available(courseId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT isAvailable FROM courses WHERE courseId = ?', [courseId], (error, results) => {
-            if (error) {
-                reject(error);
-            } else if (results.length === 0) {
-                resolve(false); // Course does not exist
-            } else {
-                resolve(results[0].isAvailable === 1); // Return true if course is available, otherwise false
-            }
-        });
-    });
-}
-
-
-// Function to check if enrolment exists
-function does_enrolment_exist(courseId, studentId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, studentId], (error, results) => {
-            if (error) {
-                console.error('Error fetching enrolment details:', error);
-                reject('An error occurred while finding enrolment details')
-            }
-            if (results.length === 0) {
-                resolve(false)
-            } else {
-                resolve(true)
-            }
-        });
-    });
-}
-
-// Function to check if the teacher is the one assigned to the course
-function is_assigned_teacher(courseId, userId) {
-    return new Promise((resolve, reject) => {
-        connection.query('SELECT TeacherID FROM courses WHERE CourseID = ? AND TeacherID = ?', [courseId, userId], (error, results) => {
-            if (error) {
-                console.error('Error fetching course details:', error);
-                reject('An error occurred while fetching course details');
-            }
-
-            // If there are results, it means the provided userId is the assigned teacher
-            if (results.length > 0) {
-                resolve(true); // User is the assigned teacher
-            } else {
-                resolve(false); // User is not the assigned teacher
-            }
-        });
-    });
-}
