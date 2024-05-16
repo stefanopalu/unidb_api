@@ -34,24 +34,21 @@ app.put('/courses/:id/enable/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters
 
     // Check if course exists
-
     const doesCourseExistPromise = does_course_exist(courseId)
 
     // Check if the user is an admin
-
     const isAdminPromise = is_admin(userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
-
-        doesCourseExist = values[0]
-        isAdmin = values[1]
+        const doesCourseExist = values[0];
+        const isAdmin = values[1];
 
         if (!isAdmin) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
 
         if (!doesCourseExist) {
-            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
         }
 
         // Main SQL query to update the database
@@ -75,23 +72,20 @@ app.put('/courses/:id/disable/:userId', (req, res) => {
     const userId = req.params.userId; // Extract userId from request parameters
 
     // Check if course exists
-
     const doesCourseExistPromise = does_course_exist(courseId)
 
     // Check if the user is an admin
-
     const isAdminPromise = is_admin(userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
-
-        doesCourseExist = values[0]
-        isAdmin = values[1]
+        const doesCourseExist = values[0];
+        const isAdmin = values[1];
         if (!isAdmin) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
 
         if (!doesCourseExist) {
-            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
         }
 
         // Main SQL query to update the database
@@ -122,24 +116,22 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     const isAdminPromise = is_admin(userId)
 
     // Check if course exists
-
     const doesCourseExistPromise = does_course_exist(courseId)
 
     // Callback for all promises
     Promise.all([isTeacherPromise, isAdminPromise, doesCourseExistPromise]).then((values) => {
-        isTeacher = values[0]
-        isAdmin = values[1]
-        doesCourseExist = values[2]
+        const isTeacher = values[0];
+        const isAdmin = values[1];
+        const doesCourseExist = values[2];
 
         if (!isAdmin) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
         if (!isTeacher) {
-            return res.status(403).json({ error: 'user is not a teacher' }); // Send 403 Forbidden if user is not authorized
+            return res.status(403).json({ error: 'User is not a teacher' }); // Send 403 Forbidden if user is not authorized
         }
-
         if (!doesCourseExist) {
-            return res.status(403).json({ error: 'Course does not exist' }); // Send 403 Forbidden if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
         }
 
         connection.query('UPDATE courses SET TeacherID = ? WHERE CourseID = ?', [teacherId, courseId], (updateError, updateResults) => {
@@ -216,7 +208,7 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
                         return res.status(500).json({ error: 'An error occurred while inserting record' });
                     }
 
-                    res.json({ message: 'Student assigned successfully' });
+                    res.json({ message: 'Student enrolled successfully' });
                 });
             } else {
                 res.json({ message: 'Student is already enrolled' });
@@ -234,10 +226,13 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
     const studentId = req.params.studentId; //Extract studentId from request parameters
     const passed = parseInt(req.params.passed); // Extract passed from request parameters
-    const userId = req.params.userId; // Extract userId from request parameters   
+    const userId = req.params.userId; // Extract userId from request parameters  
+    
+    console.log('courseId:', courseId, 'studentId:', studentId, 'passed:', passed, 'userId:', userId);
+
 
     // Check if user that is being assigned has the role teacher via a promise
-    const isTeacherPromise = is_teacher(userId)
+    const isAssignedTeacherPromise = is_assigned_teacher(courseId, userId)
 
     // Check if user that is being assigned has the role student via a promise
     const isStudentPromise = is_student(studentId)
@@ -246,21 +241,21 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     const doesEnrolmentExistPromise = does_enrolment_exist(courseId, studentId)
 
     // Callback for all promises
-    Promise.all([isTeacherPromise, isStudentPromise, doesEnrolmentExistPromise]).then((values) => {
-        const isTeacher = values[0]
-        const isStudent = values[1]
-        const doesEnrolmentExist = values[2]
+    Promise.all([isAssignedTeacherPromise, isStudentPromise, doesEnrolmentExistPromise]).then((values) => {
+        const isAssignedTeacher = values[0];
+        const isStudent = values[1];
+        const doesEnrolmentExist = values[2];
 
-        if (!isTeacher) {
+        if (!isAssignedTeacher) {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
 
         if (!isStudent) {
-            return res.status(403).json({ error: 'user is not a student' }); // Send 403 Forbidden if user is not authorized
+            return res.status(403).json({ error: 'User is not a student' }); // Send 403 Forbidden if user is not authorized
         }
 
         if (!doesEnrolmentExist) {
-            return res.status (403).json({ error: 'Enrolment does not exist'}); // Send error message that enrolment does not exist
+            return res.status (404).json({ error: 'Enrolment does not exist'}); // Send 404 Not found if enrolment does not exist
         }
 
         // Checking if passed (0 or 1)
@@ -336,7 +331,6 @@ function is_student(userId) {
 }
 
 // Function to check if course exists
-
 function does_course_exist(courseId) {
     return new Promise((resolve, reject) => {
         connection.query('SELECT * FROM courses WHERE CourseID = ?', [courseId], (error, results) => {
@@ -370,7 +364,6 @@ function is_course_available(courseId) {
 
 
 // Function to check if enrolment exists
-
 function does_enrolment_exist(courseId, studentId) {
     return new Promise((resolve, reject) => {
         connection.query('SELECT * FROM enrolments WHERE CourseID = ? AND UserID = ?', [courseId, studentId], (error, results) => {
@@ -382,6 +375,25 @@ function does_enrolment_exist(courseId, studentId) {
                 resolve(false)
             } else {
                 resolve(true)
+            }
+        });
+    });
+}
+
+// Function to check if the teacher is the one assigned to the course
+function is_assigned_teacher(courseId, userId) {
+    return new Promise((resolve, reject) => {
+        connection.query('SELECT TeacherID FROM courses WHERE CourseID = ? AND TeacherID = ?', [courseId, userId], (error, results) => {
+            if (error) {
+                console.error('Error fetching course details:', error);
+                reject('An error occurred while fetching course details');
+            }
+
+            // If there are results, it means the provided userId is the assigned teacher
+            if (results.length > 0) {
+                resolve(true); // User is the assigned teacher
+            } else {
+                resolve(false); // User is not the assigned teacher
             }
         });
     });
