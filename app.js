@@ -15,7 +15,7 @@ const connection = mysql.createConnection({
     database: "mydb"
 });
 
-// open the MySQL connection 
+// Initiate the MySQL connection 
 connection.connect(error => {
     if (error) {
         console.log("A error has been occurred "
@@ -23,7 +23,7 @@ connection.connect(error => {
         throw error;
     }
 
-    //If Everything goes correct, Then start Express Server 
+    //If everything works, start Express Server 
     app.listen(PORT, () => {
         console.log("Database connection is Ready and "
             + "Server is Listening on Port ", PORT);
@@ -38,7 +38,7 @@ app.put('/courses/:id/enable/:userId', (req, res) => {
     // Check if course exists
     const doesCourseExistPromise = validation.does_course_exist(connection, courseId)
 
-    // Check if the user is an admin
+    // Check if user is an admin
     const isAdminPromise = validation.is_admin(connection, userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
@@ -50,7 +50,7 @@ app.put('/courses/:id/enable/:userId', (req, res) => {
         }
 
         if (!doesCourseExist) {
-            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not Found if course does not exist 
         }
 
         // Main SQL query to update the database
@@ -76,7 +76,7 @@ app.put('/courses/:id/disable/:userId', (req, res) => {
     // Check if course exists
     const doesCourseExistPromise = validation.does_course_exist(connection, courseId)
 
-    // Check if the user is an admin
+    // Check if user is an admin
     const isAdminPromise = validation.is_admin(connection, userId)
 
     Promise.all([doesCourseExistPromise, isAdminPromise]).then((values) => {
@@ -87,7 +87,7 @@ app.put('/courses/:id/disable/:userId', (req, res) => {
         }
 
         if (!doesCourseExist) {
-            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not Found if course does not exist 
         }
 
         // Main SQL query to update the database
@@ -111,10 +111,10 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
     const teacherId = req.params.teacherId; // Exctract teacherId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
 
-    // Check if user that is being assigned has the role teacher via a promise
+    // Check if teacher that is being assigned has the role teacher
     const isTeacherPromise = validation.is_teacher(connection, teacherId)
 
-    // Check that the current user is an admin via a promise
+    // Check if user is an admin
     const isAdminPromise = validation.is_admin(connection, userId)
 
     // Check if course exists
@@ -130,10 +130,10 @@ app.put('/courses/:id/assign_teacher/:teacherId/:userId', (req, res) => {
             return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
         if (!isTeacher) {
-            return res.status(403).json({ error: 'User is not a teacher' }); // Send 403 Forbidden if user is not authorized
+            return res.status(403).json({ error: 'Invalid TeacherID' }); // Send 403 Forbidden if teacherID is not valid
         }
         if (!doesCourseExist) {
-            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not found if course does not exist 
+            return res.status(404).json({ error: 'Course does not exist' }); // Send 404 Not Found if course does not exist 
         }
 
         connection.query('UPDATE courses SET TeacherID = ? WHERE CourseID = ?', [teacherId, courseId], (updateError, updateResults) => {
@@ -177,7 +177,7 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
     const courseId = req.params.id; // Extract courseId from request parameters
     const userId = req.params.userId; // Extract userId from request parameters   
     
-    // Check if user that is being assigned has the role student via a promise
+    // Check if user is a student
     const isStudentPromise = validation.is_student(connection, userId);
 
     // Check if course is available
@@ -188,11 +188,11 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
         const isCourseAvailable = values[1];
 
         if (!isStudent) {
-            return res.status(403).json({ error: 'User is not a student' });
+            return res.status(403).json({ error: 'Unauthorized' }); // Send 403 Forbidden if user is not authorized
         }
 
         if (!isCourseAvailable) {
-            return res.status(403).json({ error: 'Course is not available' });
+            return res.status(403).json({ error: 'Course is not available' }); // Send 403 Forbidden if course is not available
         }
 
         // Check if the record exists in the enrolments table
@@ -210,7 +210,7 @@ app.put('/courses/:id/enrol_student/:userId', (req, res) => {
                         return res.status(500).json({ error: 'An error occurred while inserting record' });
                     }
 
-                    res.json({ message: 'Student enrolled successfully' });
+                    res.json({ message: 'Student enrolled successfully' }); // Confirmation if the student is enrolled successfully
                 });
             } else {
                 res.json({ message: 'Student is already enrolled' });
@@ -230,10 +230,10 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
     const passed = parseInt(req.params.passed); // Extract passed from request parameters
     const userId = req.params.userId; // Extract userId from request parameters  
 
-    // Check if user that is being assigned has the role teacher via a promise
+    // Check if user is the teacher assigned to the course
     const isAssignedTeacherPromise = validation.is_assigned_teacher(connection, courseId, userId)
 
-    // Check if user that is being assigned has the role student via a promise
+    // Check if studentID is valid
     const isStudentPromise = validation.is_student(connection, studentId)
 
     // Check if enrolment exists
@@ -250,16 +250,16 @@ app.put('/courses/:id/set_grade/:studentId/:passed/:userId', (req, res) => {
         }
 
         if (!isStudent) {
-            return res.status(403).json({ error: 'User is not a student' }); // Send 403 Forbidden if user is not authorized
+            return res.status(403).json({ error: 'Invalid StudentID' }); // Send 403 Forbidden if studentID is not valid
         }
 
         if (!doesEnrolmentExist) {
-            return res.status (404).json({ error: 'Enrolment does not exist'}); // Send 404 Not found if enrolment does not exist
+            return res.status (404).json({ error: 'Enrolment does not exist'}); // Send 404 Not Found if enrolment does not exist
         }
 
         // Checking if passed (0 or 1)
         if (!(passed === 0 || passed === 1)) {
-            return res.status(403).json({ error: "passed should be 1 or 0" }) //Error that passed should be 1 or 0
+            return res.status(403).json({ error: "Passed should be 1 or 0" }) //Error that passed should be 1 or 0
         }
 
         connection.query('UPDATE enrolments SET Mark = ? WHERE CourseID = ? AND UserID = ?',
